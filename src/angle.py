@@ -173,7 +173,7 @@ def angle(v1, v2):
 
     return angle2
 
-def getangle(ori_img, std_point, pointer_line, number):
+def get_value(ori_img, std_point, pointer_line, number):
     a1 = std_point[0]
     a2 = std_point[1]
     cv2.circle(ori_img, a1, 2, (255, 0, 0), 2)
@@ -536,7 +536,7 @@ if __name__ == "__main__":
         img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
         std_point, pointer_line = GA.key_point(img)
         number =['0.4']
-        value = getangle(img, std_point, pointer_line, number)
+        value = get_value(img, std_point, pointer_line, number)
         print(value)
 
 
