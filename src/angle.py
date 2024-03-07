@@ -7,6 +7,9 @@ from ultralytics.nn.autobackend import AutoBackend
 import timeit
 from time_code import time_code_execution
 from skimage import morphology
+from videocapture import VideoCapture
+import time
+
 def preprocess_letterbox(image):
     letterbox = LetterBox(new_shape=640, stride=32, auto=True)
     image = letterbox(image=image)
@@ -197,30 +200,51 @@ def getangle(ori_img, std_point, pointer_line, number):
     # print("flag",flag)
 
     std_ang = angle(v1, v2)
-    print("std_result: ", std_ang)
+    
     now_ang = angle(v1, v3)
-    print("now_ang: ", now_ang)
-    if flag >0:
-        now_ang=360-now_ang
-    # print("now_result", now_ang)
+    print("std_result: {:.3f}".format(std_ang))
+    print("now_ang:   {:.3f}".format(now_ang))
+
+    # if flag >0:
+    #     now_ang=360-now_ang
+    #     print("now_result", now_ang)
 
 
     # calculate value
     if number!=None and number[0]!="":
         two_value = float(number[0])
-        print(two_value)
+        # print(two_value)
     else:
         return "can not recognize number"
+    
+    if two_value == 0.4:
+        correction_value = 0.3333*1.05
+    if two_value == 5:
+        correction_value = 0.3333*17
+
+
+    if flag>0: 
+        k1 = 0.9
+        k2 = 1 - k1
+        two_value = ((k1 * correction_value)+(k2 * two_value))
+    else :
+        k1 = 0.5
+        k2 = 1 - k1
+        two_value = ((k1 * correction_value)+(k2 * two_value))
+
     if std_ang * now_ang !=0:
         value = (two_value / std_ang)
         value=value*now_ang
+
     else:
         return "angle detect error"
 
-    if flag>0 and distance<40:
-        value=0.00
-    else:
-        value=round(value,3)
+    value=round(value,3)
+
+    # if flag>0 and distance<40:
+    #     value=0.00
+    # else:
+    #     value=round(value,3)
 
     return value
 
@@ -235,6 +259,144 @@ def get_distance_point2line(point, line):
     vec2 = line_point2 - point
     distance = np.abs(np.cross(vec1, vec2)) / np.linalg.norm(line_point1 - line_point2)
     return distance
+
+
+
+class GetAngle():
+    """
+    计算指针在表盘中的角度 单位 °
+    
+    """
+    def __init__(self,model, w = 640, h = 480):
+        self.model = AutoBackend(weights=model)
+        self.h = h
+        self.w = w
+        self.img_center = (0.5 * w, 0.5 * h)
+        
+        # self.__img_params__()
+
+        
+
+    
+    def __img_params__(self):
+        # self.h, self.w = img.shape[:2]
+        # self.img_center = (0.5 * self.w , 0.5 * self.h)
+        print("Height:", self.h)
+        print("Width:", self.w)
+        print("Img_center:", self.img_center)
+
+    @staticmethod    
+    def _img_params_(img):
+        h, w = img.shape[:2]
+        img_center = (0.5 * w , 0.5 * h)
+        print("Height:", h)
+        print("Width:", w)
+        print("Img_center:", img_center)
+        return h, w
+
+    
+    def infer(self,img):
+        """
+        result[0] -> 1, 116, 8400 -> det head
+        result[1][0][0] -> 1, 144, 80, 80
+        result[1][0][1] -> 1, 144, 40, 40
+        result[1][0][2] -> 1, 144, 20, 20
+        result[1][1] -> 1, 32, 8400
+        result[1][2] -> 1, 32, 160, 160 -> seg head
+        """
+        img_pre, IM = preprocess_warpAffine(img)
+        result = self.model(img_pre)
+        output0 = result[0].transpose(-1, -2) # 1,8400,116 检测头输出
+        output1 = result[1][2][0]             # 32,160,160 分割头输出
+        pred = postprocess(output0)
+        pred = torch.from_numpy(np.array(pred).reshape(-1, 38))
+        # pred -> nx38 = [cx,cy,w,h,conf,label,32]
+        masks = process_mask(output1, pred[:, 6:], pred[:, :4], img_pre.shape[2:], True)
+        boxes = np.array(pred[:,:6])
+        lr = boxes[:, [0, 2]]
+        tb = boxes[:,[1, 3]]
+        boxes[:,[0, 2]] = IM[0][0] * lr + IM[0][2]
+        boxes[:,[1, 3]] = IM[1][1] * tb + IM[1][2]
+        # h, w = img.shape[:2]
+        
+        return masks, boxes, IM
+    
+    def mask2keys(self, mask ,label, std_point, pointer_line):
+
+        if label =='dail':
+            indices = np.argwhere(mask == 1)
+            center = np.mean(indices, axis=0)
+            center = tuple(center[::-1].astype(int))
+            std_point.append(center)
+        if label == 'pointer':
+            # indices = np.argwhere(mask_resized == 1)
+            pointer_skeleton = morphology.skeletonize(mask)
+            pointer_edges = pointer_skeleton * 255
+            pointer_edges = pointer_edges.astype(np.uint8)
+            # cv2.imwrite("pointer_edges.jpg", pointer_edges)
+            pointer_lines = cv2.HoughLinesP(pointer_edges, 1, np.pi / 180, 10, np.array([]), minLineLength=10,
+                                            maxLineGap=400)
+            try:
+                for x1, y1, x2, y2 in pointer_lines[0]:
+                    coin1 = (x1, y1)
+                    coin2 = (x2, y2)
+                    # cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+            except TypeError:
+                return "can not detect pointer"
+            dis1 = (coin1[0] - self.img_center[0]) ** 2 + (coin1[1] - self.img_center[1]) ** 2
+            dis2 = (coin2[0] - self.img_center[0]) ** 2 + (coin2[1] - self.img_center[1]) ** 2
+            if dis1 <= dis2:
+                pointer_line.append ([coin1, coin2])
+            else:
+                pointer_line.append ([coin2, coin1])
+
+
+        
+
+    def key_point(self, img, categories = ['dail', 'pointer']):
+        masks, boxes, IM = self.infer(img)
+
+        std_point = []
+        pointer_lines = []
+
+        for i, mask in enumerate(masks):
+            label =int(boxes[i][5])
+            label_ =categories[label]
+            
+            mask = mask.cpu().numpy().astype(np.uint8) # 640x640   
+            mask_resized = cv2.warpAffine(mask, IM, (self.w, self.h), flags=cv2.INTER_LINEAR)
+            self.mask2keys(mask_resized, label_, std_point, pointer_lines)
+            # if center != []:std_point.append(center)
+            # if pointer_line != []:  
+
+
+
+            #---------------------------colored_mask------------------
+            color = np.array(random_color(label))
+        
+            colored_mask = (np.ones((h, w, 3)) * color).astype(np.uint8)
+            masked_colored_mask = cv2.bitwise_and(colored_mask, colored_mask, mask=mask_resized)
+    
+            mask_indices = mask_resized == 1
+            img[mask_indices] = (img[mask_indices] * 0.6 + masked_colored_mask[mask_indices] * 0.4).astype(np.uint8)
+            #---------------------------colored_mask------------------
+
+        print(len(std_point))
+        print((std_point))
+        if std_point==None:
+            return "can not detect dail"
+        if std_point[0][1] >= std_point[1][1]:
+            pass
+        else:
+            std_point[0], std_point[1] = std_point[1], std_point[0]
+        
+        if len(pointer_lines)>1: return "can not detect pointer"
+
+        print("std_point", std_point)
+        print("pointer_lines", (pointer_lines))
+        return std_point, pointer_lines[0]
+        # cv2.imwrite("../images/infer-seg.jpg", img)    
+            
 
 
 def main():
@@ -284,7 +446,8 @@ def main():
 
         mask = mask.cpu().numpy().astype(np.uint8) # 640x640
         mask_resized = cv2.warpAffine(mask, IM, (w, h), flags=cv2.INTER_LINEAR)  # 1080x810
-        # print(mask_resized)
+        print(mask_resized.shape)
+        print(mask.shape)
         # cv2.imwrite("mask_resized.jpg", mask_resized*255)
         label =int(boxes[i][5])
         
@@ -360,5 +523,36 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    # cap = VideoCapture(0)
+    # frame = cap.read()
+    img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
+    model = '/home/rqh/yolo_model/pointer.pt'
+    h, w = GetAngle._img_params_(img)
+    GA = GetAngle(model, w = w, h = h)
+    
+    for i in range(5):
+        start_time = time.time()
+        img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
+        std_point, pointer_line = GA.key_point(img)
+        number =['0.4']
+        value = getangle(img, std_point, pointer_line, number)
+        print(value)
+
+
+    
+        
+
+        end_time = time.time()
+        execution_time = (end_time - start_time)*1000
+        print("执行时间: {:.2f} ms".format(execution_time))
+
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    img = cv2.putText(img, str(value), (30, 30), font, 1.2, (255, 0,255), 2)
+    cv2.line(img, pointer_line[0], pointer_line[1], (0, 255, 0), 2)
+    
+    cv2.imwrite("../images/infer-seg.jpg", img)  
+
+    # cap.terminate()
     # time_code_execution(main())
