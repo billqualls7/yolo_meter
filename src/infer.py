@@ -2,7 +2,7 @@
 Author: wuyao sss
 Date: 2024-02-22 17:11:14
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-08 10:56:39
+LastEditTime: 2024-03-08 17:08:03
 FilePath: /rqh/YOLOv8/src/infer.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -72,6 +72,10 @@ class Find_Number(Find_Meters):
         self.categories = ['0.4', '2', '5']
 
     def infer(self, img):
+        x1 = -1
+        y1 = -1
+        x2 = -1
+        y2 = -1
         max_score = -1
         max_score_cls = None
         results = self.model.predict(img, save=False, 
