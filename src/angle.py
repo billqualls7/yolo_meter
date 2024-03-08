@@ -202,8 +202,8 @@ def get_value(ori_img, std_point, pointer_line, number):
     std_ang = angle(v1, v2)
     
     now_ang = angle(v1, v3)
-    print("std_result: {:.3f}".format(std_ang))
-    print("now_ang:   {:.3f}".format(now_ang))
+    # print("std_result: {:.3f}".format(std_ang))
+    # print("now_ang:   {:.3f}".format(now_ang))
 
     # if flag >0:
     #     now_ang=360-now_ang
@@ -211,26 +211,27 @@ def get_value(ori_img, std_point, pointer_line, number):
 
 
     # calculate value
-    if number!=None and number[0]!="":
-        two_value = float(number[0])
+    if number!=None and number!="":
+        two_value = float(number)
         # print(two_value)
     else:
         return "can not recognize number"
     
     if two_value == 0.4:
         correction_value = 0.3333*1.05
+        if flag>0: 
+            k1 = 0.9
+            k2 = 1 - k1
+            two_value = ((k1 * correction_value)+(k2 * two_value))
+        else :
+            k1 = 0.5
+            k2 = 1 - k1
+            two_value = ((k1 * correction_value)+(k2 * two_value))
     if two_value == 5:
         correction_value = 0.3333*17
 
 
-    if flag>0: 
-        k1 = 0.9
-        k2 = 1 - k1
-        two_value = ((k1 * correction_value)+(k2 * two_value))
-    else :
-        k1 = 0.5
-        k2 = 1 - k1
-        two_value = ((k1 * correction_value)+(k2 * two_value))
+   
 
     if std_ang * now_ang !=0:
         value = (two_value / std_ang)
@@ -262,13 +263,14 @@ def get_distance_point2line(point, line):
 
 
 
-class GetAngle():
+class Find_Angles():
     """
     计算指针在表盘中的角度 单位 °
     
     """
     def __init__(self,model, w = 640, h = 480):
         self.model = AutoBackend(weights=model)
+
         self.h = h
         self.w = w
         self.img_center = (0.5 * w, 0.5 * h)
@@ -292,7 +294,7 @@ class GetAngle():
         print("Height:", h)
         print("Width:", w)
         print("Img_center:", img_center)
-        return h, w
+        return w, h
 
     
     def infer(self,img):
@@ -372,17 +374,17 @@ class GetAngle():
 
 
             #---------------------------colored_mask------------------
-            color = np.array(random_color(label))
-        
-            colored_mask = (np.ones((h, w, 3)) * color).astype(np.uint8)
-            masked_colored_mask = cv2.bitwise_and(colored_mask, colored_mask, mask=mask_resized)
+            # color = np.array(random_color(label))
+            # # print(h)
+            # colored_mask = (np.ones((self.h, self.w, 3)) * color).astype(np.uint8)
+            # masked_colored_mask = cv2.bitwise_and(colored_mask, colored_mask, mask=mask_resized)
     
-            mask_indices = mask_resized == 1
-            img[mask_indices] = (img[mask_indices] * 0.6 + masked_colored_mask[mask_indices] * 0.4).astype(np.uint8)
+            # mask_indices = mask_resized == 1
+            # img[mask_indices] = (img[mask_indices] * 0.6 + masked_colored_mask[mask_indices] * 0.4).astype(np.uint8)
             #---------------------------colored_mask------------------
 
-        print(len(std_point))
-        print((std_point))
+        # print(len(std_point))
+        # print((std_point))
         if std_point==None:
             return "can not detect dail"
         if std_point[0][1] >= std_point[1][1]:
@@ -392,8 +394,7 @@ class GetAngle():
         
         if len(pointer_lines)>1: return "can not detect pointer"
 
-        print("std_point", std_point)
-        print("pointer_lines", (pointer_lines))
+
         return std_point, pointer_lines[0]
         # cv2.imwrite("../images/infer-seg.jpg", img)    
             
@@ -504,7 +505,7 @@ def main():
     else:
         std_point[0], std_point[1] = std_point[1], std_point[0]
     number =['5']
-    value = getangle(img, std_point, pointer_line, number)
+    # value = getangle(img, std_point, pointer_line, number)
     # draw box
     # for obj in boxes:
     #     left, top, right, bottom = int(obj[0]), int(obj[1]), int(obj[2]), int(obj[3])
@@ -529,14 +530,14 @@ if __name__ == "__main__":
     # frame = cap.read()
     img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
     model = '/home/rqh/yolo_model/pointer.pt'
-    h, w = GetAngle._img_params_(img)
-    GA = GetAngle(model, w = w, h = h)
+    w, h = Find_Angles._img_params_(img)
+    GA = Find_Angles(model, w = w, h = h)
     
     for i in range(5):
         start_time = time.time()
         img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
         std_point, pointer_line = GA.key_point(img)
-        number =['0.4']
+        number ='0.4'
         value = get_value(img, std_point, pointer_line, number)
         print(value)
 
