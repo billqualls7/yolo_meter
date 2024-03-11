@@ -2,7 +2,7 @@
 Author: wuyao sss
 Date: 2024-02-22 17:11:14
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-08 17:08:03
+LastEditTime: 2024-03-11 10:55:42
 FilePath: /rqh/YOLOv8/src/infer.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -16,13 +16,14 @@ import time
 import threading
 import queue
 import os
+from ultralytics.utils import ops
 
 
 class Find_Meters:
     def __init__(self, model) :
         self.categories = ['pointer', 'digital']
         # self.cam = VideoCapture(0)
-        self.model = YOLO(model)
+        self.model = YOLO(task='detect', model=model)
 
         self.conf = 0.5
         self.iou = 0.7
@@ -51,19 +52,51 @@ class Find_Meters:
             # data = boxes.data.cpu().numpy()
 
             for i in range(len(boxes)):
-                # data = boxes[i]
                 x1, y1, x2, y2, score, cls = boxes[i]
-                # x1 = data[0]
-                # y1 = data[1]
-                # x2 = data[2]
-                # y2 = data[3]
-                # score = data[4]
+
                 cls = self.categories[int(cls)]
                 if cls == 'pointer':
                     threading.Thread(target=self.outimg_queue, args=(img, x1, y1, x2, y2)).start()
                 
         t1 = time.time()
         # print((t1-t0)*1000)
+    def infer_trt(self,img):
+        cropped_images = []
+        cls_list = []
+
+        h, w = img.shape[:2]
+        t0 = time.time()
+
+        results = self.model.predict(img, save=False, 
+                        imgsz=640, conf=self.conf,
+                        iou = self.iou, 
+                        visualize=False,
+                        verbose = False,
+                        stream=False
+                        )
+        # print(results)
+        
+        for result in results:
+            boxes = result.boxes.data.cpu().numpy()  # Boxes object for bounding box outputs
+            # data = boxes.data.cpu().numpy()
+
+            for i in range(len(boxes)):
+                x1, y1, x2, y2, score, cls = boxes[i]
+                cls = self.categories[int(cls)]
+                cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
+                cropped_image_re = ops.scale_image(cropped_image, img.shape)
+                cropped_image_re = np.squeeze(cropped_image_re)
+                # cropped_image_re = cv2.resize(cropped_image, (w, h))
+                cropped_images.append(cropped_image_re)
+                cls_list.append(cls)
+
+        t1 = time.time()
+        if not len(cls_list)==0:
+        # print(cls_list)
+            return cls_list[0], cropped_images[0]
+        else:
+            # 
+            return None, None
 
 
 class Find_Number(Find_Meters):
@@ -81,6 +114,7 @@ class Find_Number(Find_Meters):
         results = self.model.predict(img, save=False, 
                         imgsz=640, conf=self.conf,
                         iou = self.iou, 
+                        verbose = False,
                         visualize=False
                         )
         for result in results:

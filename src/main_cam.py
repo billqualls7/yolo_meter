@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-08 16:54:49
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-08 17:19:20
+LastEditTime: 2024-03-10 14:35:47
 FilePath: /yolo_meter/src/main _cam.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -11,18 +11,27 @@ Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查�
 import os
 import cv2
 import time
+import cProfile
 from angle import Find_Angles
 from angle import get_value
 from infer import Find_Meters
 from infer import Find_Number
 from videocapture import VideoCapture
+from concurrent.futures import ThreadPoolExecutor
 
 
 
 
 
+def infer_and_key_point(cropped_image):
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_infer = executor.submit(FN.infer, cropped_image)
+        future_key_point = executor.submit(FA.key_point, cropped_image)
 
+        number, *_ = future_infer.result()
+        std_point, pointer_line = future_key_point.result()
 
+    return number, std_point, pointer_line
 
 
 
@@ -30,7 +39,7 @@ from videocapture import VideoCapture
 
 if __name__ == "__main__":  
 
-    cap = VideoCapture(1)
+    cap = VideoCapture(0)
 
     model_1 = '/home/rqh/yolo_model/meter.pt'
     model_2 = '/home/rqh/yolo_model/num.pt'
@@ -58,9 +67,10 @@ if __name__ == "__main__":
 
                 # print(img.shape)
                 # print(cropped_image.shape)
-                number, *_ = FN.infer(cropped_image)
-                std_point, pointer_line = FA.key_point(cropped_image)
-
+                # number, *_ = FN.infer(cropped_image)
+                # std_point, pointer_line = FA.key_point(cropped_image)
+                # cProfile.run('FA.key_point(cropped_image)')
+                number, std_point, pointer_line = infer_and_key_point(cropped_image)
                 value = get_value(cropped_image, std_point, pointer_line, number)
                 # print(value)
                 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -83,8 +93,7 @@ if __name__ == "__main__":
             cap.terminate()
             break
     cap.terminate()
-        # except: 
-        #     print('*******************')
+
 
 
 

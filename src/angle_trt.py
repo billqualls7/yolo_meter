@@ -1,5 +1,6 @@
 import cv2
 import torch
+import threading
 import numpy as np
 import torch.nn.functional as F
 from ultralytics.data.augment import LetterBox
@@ -9,6 +10,9 @@ from time_code import time_code_execution
 from skimage import morphology
 from videocapture import VideoCapture
 import time
+from ultralytics import YOLO
+from ultralytics.utils import ops
+from videocapture import VideoCapture
 
 def preprocess_letterbox(image):
     letterbox = LetterBox(new_shape=640, stride=32, auto=True)
@@ -31,11 +35,14 @@ def preprocess_warpAffine(image, dst_width=640, dst_height=640):
                              borderMode=cv2.BORDER_CONSTANT, borderValue=(114, 114, 114))
     IM = cv2.invertAffineTransform(M)
  
-    img_pre = (img_pre[...,::-1] / 255.0).astype(np.float32)
-    img_pre = img_pre.transpose(2, 0, 1)[None]
-    img_pre = torch.from_numpy(img_pre)
+    # img_pre = (img_pre[...,::-1] / 255.0).astype(np.float32)
+    # img_pre = img_pre.transpose(2, 0, 1)[None]
+    # img_pre = torch.from_numpy(img_pre)
     return img_pre, IM
  
+
+
+
 def iou(box1, box2):
     def area_box(box):
         return (box[2] - box[0]) * (box[3] - box[1])
@@ -177,12 +184,10 @@ def angle(v1, v2):
     return angle2
 
 def get_value(ori_img, std_point, pointer_line, number):
-    if std_point == None: return -1
-    if pointer_line == None: return -1
     a1 = std_point[0]
     a2 = std_point[1]
-    # cv2.circle(ori_img, a1, 2, (255, 0, 0), 2)
-    # cv2.circle(ori_img, a2, 2, (255, 0, 0), 2)
+    cv2.circle(ori_img, a1, 2, (255, 0, 0), 2)
+    cv2.circle(ori_img, a2, 2, (255, 0, 0), 2)
     one = [[pointer_line[0][0], pointer_line[0][1]], [a1[0], a1[1]]]
     two = [[pointer_line[0][0], pointer_line[0][1]], [a2[0], a2[1]]]
     three = [[pointer_line[0][0], pointer_line[0][1]], [pointer_line[1][0], pointer_line[1][1]]]
@@ -274,11 +279,13 @@ class Find_Angles():
     
     """
     def __init__(self,model, w = 640, h = 480):
-        self.model = AutoBackend(weights=model)
-
+        self.model = YOLO(task="segment", model= model)
+        self.categories = ['dail', 'pointer']
         self.h = h
         self.w = w
         self.img_center = (0.5 * w, 0.5 * h)
+        self.conf = 0.3
+        self.iou = 0.7
         
         # self.__img_params__()
 
@@ -303,45 +310,85 @@ class Find_Angles():
 
     
     def infer(self,img):
-        """
-        result[0] -> 1, 116, 8400 -> det head
-        result[1][0][0] -> 1, 144, 80, 80
-        result[1][0][1] -> 1, 144, 40, 40
-        result[1][0][2] -> 1, 144, 20, 20
-        result[1][1] -> 1, 32, 8400
-        result[1][2] -> 1, 32, 160, 160 -> seg head
-        """
-        img_pre, IM = preprocess_warpAffine(img)
-        result = self.model(img_pre)
-        output0 = result[0].transpose(-1, -2) # 1,8400,116 检测头输出
-        output1 = result[1][2][0]             # 32,160,160 分割头输出
-        pred = postprocess(output0)
-        pred = torch.from_numpy(np.array(pred).reshape(-1, 38))
-        # pred -> nx38 = [cx,cy,w,h,conf,label,32]
-        masks = process_mask(output1, pred[:, 6:], pred[:, :4], img_pre.shape[2:], True)
-        boxes = np.array(pred[:,:6])
-        lr = boxes[:, [0, 2]]
-        tb = boxes[:,[1, 3]]
-        boxes[:,[0, 2]] = IM[0][0] * lr + IM[0][2]
-        boxes[:,[1, 3]] = IM[1][1] * tb + IM[1][2]
-        # h, w = img.shape[:2]
+        std_point=[]
+        pointer_line =[]
+
+
+        results = self.model.predict(img, save=False, 
+                        imgsz=640, conf=self.conf,
+                        iou = self.iou, 
+                        visualize=False,
+                        verbose = False,
+                        stream=True
+                        )
+        for result in results:
+            boxes = result.boxes.data.cpu().numpy() 
+            
+            for i in range(len(boxes)):
+                x1, y1, x2, y2, score, cls = boxes[i]
+               
+                cls = self.categories[int(cls)]
+                if cls =='dail':
+                    mask = result.masks[i].xy[0]
+                    center_x = int(np.mean(mask[:, 0]))
+                    center_y = int(np.mean(mask[:, 1]))
+                    center = (center_x, center_y)
+                    std_point.append(center)
+                    cv2.circle(img, (center_x, center_y), radius=5, color=(0, 0, 255), thickness=-1)
+                if cls == 'pointer':
+                    mask = result.masks[i].data[0].cpu().numpy() 
+                    # mask = cv2.warpAffine(mask, IM, (self.w, self.h), flags=cv2.INTER_LINEAR)
+                    # print(mask.shape)
+                    mask = ops.scale_image(mask, img.shape)
+                    mask = np.squeeze(mask)
+                    # print(mask.shape)
+                    # print(type(mask))
+                    # cv2.imwrite("mask.jpg", mask*255)
+                    # print(mask)
+                    pointer_skeleton = morphology.skeletonize(mask)
+                    pointer_edges = pointer_skeleton * 255
+                    pointer_edges = pointer_edges.astype(np.uint8)
+                    # cv2.imwrite("pointer_edges.jpg", pointer_edges)
+                    pointer_lines = cv2.HoughLinesP(pointer_edges, 1, np.pi / 180, 10, np.array([]), minLineLength=10,
+                                                    maxLineGap=400)
+                    # print(pointer_lines)
+                    try:
+                        for x1, y1, x2, y2 in pointer_lines[0]:
+                            coin1 = (x1, y1)
+                            coin2 = (x2, y2)
+                            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 255), 2)
+                    except Exception as e:
+                        print("can not find pointer")
+                        pass
+                        
+                        
+                    dis1 = (coin1[0] - self.img_center[0]) ** 2 + (coin1[1] - self.img_center[1]) ** 2
+                    dis2 = (coin2[0] - self.img_center[0]) ** 2 + (coin2[1] - self.img_center[1]) ** 2
+                    if dis1 <= dis2:
+                        pointer_line.append ([coin1, coin2])
+                    else:
+                        pointer_line.append ([coin2, coin1])
+
+            
+                    # print(center_x, center_y)
+                # cv2.circle(img, (center_x, center_y), radius=5, color=(0, 0, 255), thickness=-1)
+                        
+        if std_point==None or len(std_point) != 2:
+            return None, None
+        if std_point[0][1] >= std_point[1][1]:
+            pass
+        else:
+            std_point[0], std_point[1] = std_point[1], std_point[0]
+
+        # if len(pointer_lines)>1: return None, None
+
+        # cv2.imwrite("img.jpg", img)
+        return std_point , pointer_line[0]
+
+
         
-        return masks, boxes, IM
-    
-        # output0 = result[0].transpose(-1, -2) # 1,8400,116 检测头输出
-        # output1 = result[1][2][0]             # 32,160,160 分割头输出
-        # pred = postprocess(output0)
-        # pred = torch.from_numpy(np.array(pred).reshape(-1, 38))
-        # # pred -> nx38 = [cx,cy,w,h,conf,label,32]
-        # masks = process_mask(output1, pred[:, 6:], pred[:, :4], img_pre.shape[2:], True)
-        # boxes = np.array(pred[:,:6])
-        # lr = boxes[:, [0, 2]]
-        # tb = boxes[:,[1, 3]]
-        # boxes[:,[0, 2]] = IM[0][0] * lr + IM[0][2]
-        # boxes[:,[1, 3]] = IM[1][1] * tb + IM[1][2]
-        # # h, w = img.shape[:2]
-        
-        # return masks, boxes, IM
+
+       
     
 
     def mask2keys(self, mask ,label, std_point, pointer_line):
@@ -356,10 +403,9 @@ class Find_Angles():
             pointer_skeleton = morphology.skeletonize(mask)
             pointer_edges = pointer_skeleton * 255
             pointer_edges = pointer_edges.astype(np.uint8)
-            cv2.imwrite("pointer_edges_1.jpg", pointer_edges)
+            # cv2.imwrite("pointer_edges.jpg", pointer_edges)
             pointer_lines = cv2.HoughLinesP(pointer_edges, 1, np.pi / 180, 10, np.array([]), minLineLength=10,
                                             maxLineGap=400)
-            print(pointer_lines)
             try:
                 for x1, y1, x2, y2 in pointer_lines[0]:
                     coin1 = (x1, y1)
@@ -548,35 +594,53 @@ def main():
 
 if __name__ == "__main__":
     # main()
-    # cap = VideoCapture(0)
-    # frame = cap.read()
+    cap = VideoCapture(0)
+    frame = cap.read()
     img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
-    model = '/home/rqh/yolo_model/pointer.pt'
-    w, h = Find_Angles._img_params_(img)
+    model = '/home/rqh/yolo_model/pointer.engine'
+    w, h = Find_Angles._img_params_(frame)
     GA = Find_Angles(model, w = w, h = h)
-    
-    for i in range(5):
-        start_time = time.time()
-        img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
-        std_point, pointer_line = GA.key_point(img)
-        number ='0.4'
-        value = get_value(img, std_point, pointer_line, number)
-        print(value)
+    while True:
+        frame = cap.read()
+        cv2.imshow("frame", frame)
+        try:
+            
+            # print(type(frame))
+            GA.infer(frame)
+            # std_point, pointer_line = GA.infer(frame)
+            # value = get_value(frame, std_point, pointer_line, 5)
+            # font = cv2.FONT_HERSHEY_SIMPLEX
+            # cropped_image = cv2.putText(cropped_image, str(value), (30, 30), font, 1.2, (255, 0,255), 2)
+            cv2.imshow("infer", frame)
+            if chr(cv2.waitKey(1)&255) == 'q':  # 按 q 退出
+                cap.terminate()
+                break
+        except Exception as e:
+            print("An exception occurred:", e)
+    # for i in range(5):
+    #     img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
+    #     GA.infer(img)
+    #     start_time = time.time()
+    #     img = cv2.imread('/home/rqh/Detect-and-read-meters/demo1/1032.jpg')
+    #     std_point, pointer_line = GA.key_point(img)
+    #     number ='0.4'
+    #     value = get_value(img, std_point, pointer_line, number)
+    #     print(value)
 
 
     
         
 
-        end_time = time.time()
-        execution_time = (end_time - start_time)*1000
-        print("执行时间: {:.2f} ms".format(execution_time))
+    #     end_time = time.time()
+    #     execution_time = (end_time - start_time)*1000
+    #     print("执行时间: {:.2f} ms".format(execution_time))
 
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    img = cv2.putText(img, str(value), (30, 30), font, 1.2, (255, 0,255), 2)
-    cv2.line(img, pointer_line[0], pointer_line[1], (0, 255, 0), 2)
+    # font = cv2.FONT_HERSHEY_SIMPLEX
+    # img = cv2.putText(img, str(value), (30, 30), font, 1.2, (255, 0,255), 2)
+    # cv2.line(img, pointer_line[0], pointer_line[1], (0, 255, 0), 2)
     
-    cv2.imwrite("../images/infer-seg.jpg", img)  
+    # cv2.imwrite("../images/infer-seg.jpg", img)  
 
     # cap.terminate()
     # time_code_execution(main())

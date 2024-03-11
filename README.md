@@ -8,6 +8,15 @@
 
 environment.yml
 
+安装TRT
+
+```bash
+python3 -m pip install nvidia-pyindex
+
+python3 -m pip install --upgrade nvidia-tensorrt
+
+pip3 install nvidia-tensorrt==8.4.3.1
+```
 
 
 参考
