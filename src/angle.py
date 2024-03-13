@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from ultralytics.data.augment import LetterBox
 from ultralytics.nn.autobackend import AutoBackend
 import timeit
-from time_code import time_code_execution
+from src.time_code import time_code_execution
 from skimage import morphology
-from videocapture import VideoCapture
+from src.videocapture import VideoCapture
 import time
 
 def preprocess_letterbox(image):
@@ -220,7 +220,7 @@ def get_value(ori_img, std_point, pointer_line, number):
         two_value = float(number)
         # print(two_value)
     else:
-        return "can not recognize number"
+        return -1
     
     if two_value == 0.4:
         correction_value = 0.3333*1.05
@@ -243,7 +243,7 @@ def get_value(ori_img, std_point, pointer_line, number):
         value=value*now_ang
 
     else:
-        return "angle detect error"
+        return -1
 
     value=round(value,3)
 

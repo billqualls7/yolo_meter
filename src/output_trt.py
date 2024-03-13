@@ -1,9 +1,9 @@
 '''
 Author: wuyao 1955416359@qq.com
-Date: 2024-03-08 16:54:49
+Date: 2024-03-13 16:35:09
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-13 16:45:15
-FilePath: /yolo_meter/src/main _cam.py
+LastEditTime: 2024-03-13 16:54:15
+FilePath: /yolo_meter/src/output_trt.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
 
@@ -16,53 +16,38 @@ import torch
 import threading
 import traceback
 from queue import Queue
-from angle_trt import Find_Angles
-from angle import get_value
-from infer import Find_Meters
-from infer import Find_Number
-from videocapture import VideoCapture
+from src.angle_trt import Find_Angles
+from src.angle import get_value
+from src.infer import Find_Meters
+from src.infer import Find_Number
+from src.videocapture import VideoCapture
 from concurrent.futures import ThreadPoolExecutor
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 
-
+class INFER():
+    def __init__(self):
+        model_1 = '/home/rqh/yolo_model/meter.engine'
+        model_2 = '/home/rqh/yolo_model/num.engine'
+        model_3 = '/home/rqh/yolo_model/pointer.engine'
+        self.FA = Find_Angles(model_3)
+        self.FM = Find_Meters(model_1)
+        self.FN = Find_Number(model_2)
+        print("Model is loading...")
     
 
+    def results(self, img):
 
+        try:  
+            start_time = time.time()
 
-if __name__ == "__main__":  
-
-    cap = VideoCapture(0)
-
-    model_1 = '/home/rqh/yolo_model/meter.engine'
-    model_2 = '/home/rqh/yolo_model/num.engine'
-    model_3 = '/home/rqh/yolo_model/pointer.engine'
-    
-    
-    FA = Find_Angles(model_3)
-    FM = Find_Meters(model_1)
-    FN = Find_Number(model_2)
-    
-    print("infer...")
-
-    while True:
-        img = cap.read()
-        # try:
-            
-
-        cv2.imshow("img", img)
-        
-        start_time = time.time()
-
-        try:
-            
-            meter_cls, cropped_image = FM.infer_trt(img)
+            meter_cls, cropped_image = self.FM.infer_trt(img)
             # print(cropped_image.shape)
 
             if meter_cls == 'pointer':
-                std_point, pointer_line= FA.infer(cropped_image)
-                number, *_ = FN.infer(cropped_image)
+                std_point, pointer_line= self.FA.infer(cropped_image)
+                number, *_ = self.FN.infer(cropped_image)
                 value = get_value(cropped_image, std_point, pointer_line, number)
                 
                 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -78,18 +63,34 @@ if __name__ == "__main__":
                 print("执行时间: {:.2f} ms".format(execution_time))
                 print('---------------------------------------------------------------------')
                 
-                cv2.imshow("infer", cropped_image)
-        
+                
+                return cropped_image, value
+            else: return None, None
         except Exception as e:
             print("An exception occurred:", e)
             # raise ValueError("Something went wrong during inference with FA.infer") from e
         except KeyboardInterrupt:
             cap.terminate()
-            
-        if chr(cv2.waitKey(1)&255) == 'q':  # 按 q 退出
-            cap.terminate()
-            break
-        
+
+    
+
+
+
+if __name__ == "__main__":  
+
+    cap = VideoCapture(0)
+
+    infer = INFER()
+    while True:
+        img = cap.read()
+        cv2.imshow("img.jpg", img)
+        cropped_image, value = infer.results(img)
+        if value != None:
+            cv2.imshow("infer", cropped_image)
+        cv2.waitKey(1)
+
+
+
 
 
 

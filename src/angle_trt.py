@@ -6,13 +6,12 @@ import torch.nn.functional as F
 from ultralytics.data.augment import LetterBox
 from ultralytics.nn.autobackend import AutoBackend
 import timeit
-from time_code import time_code_execution
+from src.time_code import time_code_execution
 from skimage import morphology
-from videocapture import VideoCapture
+from src.videocapture import VideoCapture
 import time
 from ultralytics import YOLO
 from ultralytics.utils import ops
-from videocapture import VideoCapture
 
 def preprocess_letterbox(image):
     letterbox = LetterBox(new_shape=640, stride=32, auto=True)
