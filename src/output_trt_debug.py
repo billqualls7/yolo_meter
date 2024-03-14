@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-13 16:35:09
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-14 20:27:49
+LastEditTime: 2024-03-14 20:59:13
 FilePath: /yolo_meter/src/output_trt.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -16,11 +16,11 @@ import torch
 import threading
 import traceback
 from queue import Queue
-from src.angle_trt import Find_Angles
-from src.angle import get_value
-from src.infer import Find_Meters
-from src.infer import Find_Number
-from src.videocapture import VideoCapture
+from angle_trt import Find_Angles
+from angle_trt import get_value
+from infer import Find_Meters
+from infer import Find_Number
+from videocapture import VideoCapture
 from concurrent.futures import ThreadPoolExecutor
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -96,10 +96,17 @@ if __name__ == "__main__":
             offset_y = 0
             offset_x = max(offset_x, 0)
             offset_y = max(offset_y, 0)
-            img_resized = cv2.resize(img, (24, 32))
+            img_resized = cv2.resize(img, (32*4, 24*4))
             img_cropped = cropped_image.copy()
-            img_cropped[:24, offset_x:offset_x+32] = img_resized
-            cv2.imshow("infer", cropped_image)
+
+            # 修改偏移量以将小图片放置在右上角
+            offset_x_new = img_w - (32*4)
+            offset_y_new = 0
+
+            # 调整小图片位置
+            img_cropped[offset_y_new:offset_y_new+24*4, offset_x_new:offset_x_new+32*4] = img_resized
+
+            cv2.imshow("infer", img_cropped)
         else:
             cv2.imshow("infer", img)
 

@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-08 16:54:49
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-13 16:45:15
+LastEditTime: 2024-03-14 20:23:04
 FilePath: /yolo_meter/src/main _cam.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -17,7 +17,7 @@ import threading
 import traceback
 from queue import Queue
 from angle_trt import Find_Angles
-from angle import get_value
+from angle_trt import get_value
 from infer import Find_Meters
 from infer import Find_Number
 from videocapture import VideoCapture

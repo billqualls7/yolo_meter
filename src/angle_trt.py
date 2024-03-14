@@ -6,9 +6,7 @@ import torch.nn.functional as F
 from ultralytics.data.augment import LetterBox
 from ultralytics.nn.autobackend import AutoBackend
 import timeit
-from src.time_code import time_code_execution
 from skimage import morphology
-from src.videocapture import VideoCapture
 import time
 from ultralytics import YOLO
 from ultralytics.utils import ops
@@ -183,10 +181,12 @@ def angle(v1, v2):
     return angle2
 
 def get_value(ori_img, std_point, pointer_line, number):
+    if std_point == None: return -1
+    if pointer_line == None: return -1
     a1 = std_point[0]
     a2 = std_point[1]
-    cv2.circle(ori_img, a1, 2, (255, 0, 0), 2)
-    cv2.circle(ori_img, a2, 2, (255, 0, 0), 2)
+    # cv2.circle(ori_img, a1, 2, (255, 0, 0), 2)
+    # cv2.circle(ori_img, a2, 2, (255, 0, 0), 2)
     one = [[pointer_line[0][0], pointer_line[0][1]], [a1[0], a1[1]]]
     two = [[pointer_line[0][0], pointer_line[0][1]], [a2[0], a2[1]]]
     three = [[pointer_line[0][0], pointer_line[0][1]], [pointer_line[1][0], pointer_line[1][1]]]
@@ -224,7 +224,7 @@ def get_value(ori_img, std_point, pointer_line, number):
         two_value = float(number)
         # print(two_value)
     else:
-        return "can not recognize number"
+        return -1
     
     if two_value == 0.4:
         correction_value = 0.3333*1.05
@@ -247,7 +247,7 @@ def get_value(ori_img, std_point, pointer_line, number):
         value=value*now_ang
 
     else:
-        return "angle detect error"
+        return -1
 
     value=round(value,3)
 
