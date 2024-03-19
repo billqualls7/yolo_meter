@@ -1,5 +1,6 @@
 import cv2
 import torch
+import math
 import threading
 import numpy as np
 import torch.nn.functional as F
@@ -270,6 +271,10 @@ def get_distance_point2line(point, line):
     distance = np.abs(np.cross(vec1, vec2)) / np.linalg.norm(line_point1 - line_point2)
     return distance
 
+def distance(point1, point2):
+    """计算两点之间的距离"""
+    return np.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+
 
 
 class Find_Angles():
@@ -283,8 +288,8 @@ class Find_Angles():
         self.h = h
         self.w = w
         self.img_center = (0.5 * w, 0.5 * h)
-        self.conf = 0.3
-        self.iou = 0.7
+        self.conf = 0.35
+        self.iou = 0.8
         
         # self.__img_params__()
 
@@ -333,7 +338,7 @@ class Find_Angles():
                     center_y = int(np.mean(mask[:, 1]))
                     center = (center_x, center_y)
                     std_point.append(center)
-                    cv2.circle(img, (center_x, center_y), radius=5, color=(0, 0, 255), thickness=-1)
+                    # cv2.circle(img, (center_x, center_y), radius=5, color=(0, 0, 255), thickness=-1)
                 if cls == 'pointer':
                     mask = result.masks[i].data[0].cpu().numpy() 
                     # mask = cv2.warpAffine(mask, IM, (self.w, self.h), flags=cv2.INTER_LINEAR)
@@ -371,14 +376,42 @@ class Find_Angles():
             
                     # print(center_x, center_y)
                 # cv2.circle(img, (center_x, center_y), radius=5, color=(0, 0, 255), thickness=-1)
-                        
+        if len(std_point)==3:
+            # print(std_point)
+            # 计算每对点之间的距离
+            distances = [[(i, j), abs(std_point[i][1] - std_point[j][1])] for i in range(3) for j in range(i+1, 3)]
+            
+            # 按照距离排序
+            distances.sort(key=lambda x: x[1])
+            
+            # 找到距离最近的两个点的索引
+            closest_indices = distances[0][0]
+            
+            # 将这两个点的坐标相加取平均，得到新的点
+            new_point = [(std_point[closest_indices[0]][0] + std_point[closest_indices[1]][0]) // 2,
+                        (std_point[closest_indices[0]][1] + std_point[closest_indices[1]][1]) // 2]
+            
+            # 删除原来的两个点，将新点加入
+            std_point.remove(std_point[closest_indices[0]])
+            std_point.remove(std_point[closest_indices[1] - 1])  # 删除第二个点时，索引要减1
+            std_point.append(new_point)
+            
+            # print(std_point)
+            # 按距离排序
+            # distances.sort(key=lambda x: x[2], reverse=True)
+            # print(distances)
+            # 保留距离最远的两个点
+            # std_point = [(std_point[distances[0][0]], std_point[distances[0][1]]), 
+            #            (std_point[distances[1][0]], std_point[distances[1][1]])]
+            # std_point = [np.array(point) for point in std_point]
+
         if std_point==None or len(std_point) != 2:
             return None, None
         if std_point[0][1] >= std_point[1][1]:
             pass
         else:
             std_point[0], std_point[1] = std_point[1], std_point[0]
-
+        # print(type(std_point)).
         # if len(pointer_lines)>1: return None, None
 
         # cv2.imwrite("img.jpg", img)
