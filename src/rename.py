@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-08 15:22:22
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-08 15:22:46
+LastEditTime: 2024-03-20 16:11:17
 FilePath: /yolo_meter/src/rename.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -38,6 +38,6 @@ def rename_images(input_folder, output_folder):
             count += 1
 
 # 调用函数并传入输入和输出文件夹路径
-input_folder = "/home/rqh/dataset/meter_c"
-output_folder = "/home/rqh/dataset/meter_cc"
+input_folder = "/home/rqh/yolo_meter/airknob"
+output_folder = "/home/rqh/yolo_meter/airknob"
 rename_images(input_folder, output_folder)
