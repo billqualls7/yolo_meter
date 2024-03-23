@@ -19,9 +19,15 @@ pip3 install nvidia-tensorrt==8.4.3.1
 ```
 
 检测圆表
-src/output_trt.py
+
+src/output_trt_debug.py
+
 检测空调
+
 src/infer_air.py
+
+
+
 参考
 
 https://github.com/shouxieai/tensorRT_Pro
