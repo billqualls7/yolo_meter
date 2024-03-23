@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-20 15:55:53
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-23 20:41:34
+LastEditTime: 2024-03-23 20:50:20
 FilePath: /yolo_meter/src/infer_air.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -18,6 +18,7 @@ import os
 from ultralytics.utils import ops
 from math import sqrt, atan2, cos, sin
 from infer import Find_Meters
+from videocapture import VideoCapture
 
 
 class Colormap:
@@ -58,7 +59,7 @@ class Find_AirKnob():
         # self.cam = VideoCapture(0)
         self.model = YOLO(task="segment", model= model)
 
-        self.conf = 0.3
+        self.conf = 0.5
         self.iou = 0.5
         self.colormap = Colormap()
         
@@ -165,7 +166,8 @@ class Find_AirKnob():
 
         k = theta_degrees_std/std
         print(k)
-        value = ((theta_degrees_pre / theta_degrees_std)/(k) * 5 + 10)
+        # value = ((theta_degrees_pre / theta_degrees_std)/(k) * 5 + 10)
+        value = ((theta_degrees_pre / theta_degrees_std) * 5 + 10)
         value = round(value, 3)
 
         print(theta_degrees_std)
@@ -202,7 +204,7 @@ class Find_AirKnob():
                 mask = result.masks[i].xy[0]
                 center_x = (np.mean(mask[:, 0]))
                 center_y = (np.mean(mask[:, 1]))
-                cv2.circle(img, (int(center_x), int(center_y)), radius=10, color=self.colormap.red, thickness=-1)
+                cv2.circle(img, (int(center_x), int(center_y)), radius=5, color=self.colormap.red, thickness=-1)
                 air_map[cls] = (center_x, center_y)
 
 
@@ -272,11 +274,11 @@ if __name__ == "__main__":
     FAir_knob.infer(cropped_image)
     cv2.imwrite('../airknob/infer_air.jpg', cropped_image)
     # for i in range(10):
+    cap = VideoCapture(0)
     while True:
-        ret, frame = cap.read() 
+        frame = cap.read() 
         # frame = cv2.resize(frame, (640, 480))
-        if not ret:
-            break 
+
         try:
         # img = cv2.imread('/home/rqh/yolo_meter/airknob/frame_4.jpg')
             cls, cropped_image = FAir.infer_trt(frame)
@@ -284,9 +286,18 @@ if __name__ == "__main__":
             # cv2.imwrite('../airknob/infer_air.jpg', cropped_image)
             font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(cropped_image, str(value), (30, 30), font, 1.5, FAir_knob.colormap.white, 2)
+            cv2.imshow("infer", cropped_image)
 
-            out.write(cropped_image)
-        except: continue
+            if chr(cv2.waitKey(1)&255) == 'q':  # 按 q 退出
+                cap.terminate()
+                break
+            # out.write(cropped_image)
+        except:
+            cv2.imshow("infer", frame) 
+            if chr(cv2.waitKey(1)&255) == 'q':  # 按 q 退出
+                cap.terminate()
+                break
+            continue
 cap.release()
 out.release()
 cv2.destroyAllWindows()
