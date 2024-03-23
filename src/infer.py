@@ -2,7 +2,7 @@
 Author: wuyao sss
 Date: 2024-02-22 17:11:14
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-14 20:23:20
+LastEditTime: 2024-03-23 19:49:22
 FilePath: /rqh/YOLOv8/src/infer.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -85,6 +85,7 @@ class Find_Meters:
                 cropped_image = img[int(y1):int(y2), int(x1):int(x2)]
                 cropped_image_re = ops.scale_image(cropped_image, img.shape)
                 cropped_image_re = np.squeeze(cropped_image_re)
+                # cv2.imwrite('../airknob/cropped_image_re.jpg', cropped_image)
                 # cropped_image_re = cv2.resize(cropped_image, (w, h))
                 cropped_images.append(cropped_image_re)
                 cls_list.append(cls)

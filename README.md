@@ -18,7 +18,10 @@ python3 -m pip install --upgrade nvidia-tensorrt
 pip3 install nvidia-tensorrt==8.4.3.1
 ```
 
-
+检测圆表
+src/output_trt.py
+检测空调
+src/infer_air.py
 参考
 
 https://github.com/shouxieai/tensorRT_Pro
