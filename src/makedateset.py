@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-20 12:31:35
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-25 15:45:20
+LastEditTime: 2024-03-25 15:46:35
 FilePath: /rqh/dataset/makedateset.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -37,7 +37,7 @@ while cap.isOpened():
 
     # 每四帧保存一次
     if frame_count % 4 == 0:
-        frame_filename = f'{output_folder}/frame_{frame_count}.jpg'
+        frame_filename = f'{output_folder}/framev30_{frame_count}.jpg'
         cv2.imwrite(frame_filename, frame)
 
     frame_count += 1
