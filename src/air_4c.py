@@ -2,7 +2,7 @@
 Author: wuyao 1955416359@qq.com
 Date: 2024-03-20 21:42:08
 LastEditors: wuyao 1955416359@qq.com
-LastEditTime: 2024-03-25 17:00:37
+LastEditTime: 2024-03-25 19:46:21
 FilePath: /yolo_meter/src/air_4c.py
 Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 '''
@@ -51,6 +51,7 @@ class Find_Air(Find_Meters):
     def infer_trt(self,img):
         cropped_images = []
         cls_list = []
+        xyxy_list = []
 
         h, w = img.shape[:2]
         t0 = time.time()
@@ -78,11 +79,12 @@ class Find_Air(Find_Meters):
                 # cropped_image_re = cv2.resize(cropped_image, (w, h))
                 cropped_images.append(cropped_image)
                 cls_list.append(cls)
+                xyxy_list.append([x1, y1, x2, y2])
 
         t1 = time.time()
         if not len(cls_list)==0:
         # print(cls_list)
-            return cls_list[0], cropped_images[0]
+            return cls_list[0], cropped_images[0], xyxy_list[0]
         else:
             # 
             return None, None
